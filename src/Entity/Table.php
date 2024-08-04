@@ -2,37 +2,72 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\NumericFilter;
+use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
 use App\Repository\TableRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: TableRepository::class)]
 #[ORM\Table(name: '`table`')]
+#[ApiResource(
+    operations: [
+        new Get(normalizationContext: ['groups' => 'table:item']),
+        new GetCollection(normalizationContext: ['groups' => 'table:list']),
+        new Get(uriTemplate: '/tables/{id}/guests', normalizationContext: ['groups' => 'table:guests']),
+        new GetCollection(uriTemplate: '/tables_stats', normalizationContext: ['groups' => 'table:tables_stats']),
+        new Patch(),
+    ],
+    forceEager: false,
+    paginationEnabled: false,
+)]
+#[ApiFilter(NumericFilter::class, properties: ['number'])]
 class Table
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['table:list', 'table:item', 'table:tables_stats', 'guest:list', 'guest:item'])]
     private ?int $id = null;
 
     #[ORM\Column]
+    #[Groups(['table:list', 'table:item', 'table:tables_stats', 'guest:list', 'guest:item'])]
     private ?int $number = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['table:list', 'table:item', 'guest:list', 'guest:item'])]
     private ?string $description = null;
 
     #[ORM\Column(nullable: true)]
-    private ?int $max_guests = null;
+    #[Groups(['table:list', 'table:item', 'table:tables_stats', 'guest:list', 'guest:item'])]
+    private ?int $maxGuests = null;
 
     /**
      * @var Collection<int, Guest>
      */
     #[ORM\OneToMany(targetEntity: Guest::class, mappedBy: 'table_')]
+    #[Groups(['table:list', 'table:item', 'table:guests', 'guest:list', 'guest:item'])]
     private Collection $guests;
 
-    #[ORM\Column]
-    private ?\DateTimeImmutable $created_at = null;
+    #[Groups(['table:list', 'table:item', 'table:tables_stats', 'guest:list', 'guest:item'])]
+    public function getGuestsDef(): int
+    {
+        return $this->guests->count();
+    }
+
+    #[Groups(['table:list', 'table:item', 'table:tables_stats', 'guest:list', 'guest:item'])]
+    public function getGuestsNow(): int
+    {
+        return $this->guests->filter(function($guest) {
+            return $guest->getIsPresent();
+        })->count();
+    }
 
     public function __construct()
     {
@@ -70,12 +105,12 @@ class Table
 
     public function getMaxGuests(): ?int
     {
-        return $this->max_guests;
+        return $this->maxGuests;
     }
 
-    public function setMaxGuests(?int $max_guests): static
+    public function setMaxGuests(?int $maxGuests): static
     {
-        $this->max_guests = $max_guests;
+        $this->maxGuests = $maxGuests;
 
         return $this;
     }
@@ -110,15 +145,8 @@ class Table
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    public function __toString(): string
     {
-        return $this->created_at;
-    }
-
-    public function setCreatedAt(\DateTimeImmutable $created_at): static
-    {
-        $this->created_at = $created_at;
-
-        return $this;
+        return 'Стол ' . $this->number;
     }
 }
